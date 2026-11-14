@@ -7,8 +7,9 @@
 ### 1. Supabase
 1. ליצור פרויקט חדש ב-supabase.com. לשמור את סיסמת מסד הנתונים במנהל סיסמאות.
 2. ב-SQL Editor להריץ את `supabase/schema.sql`. בסוף הקובץ להוריד את סימן ההערה מהשורה של `allowed_users` ולשים בה את שתי כתובות האימייל.
-3. ב-Authentication → Sign In / Providers: לכבות את "Allow new users to sign up".
-4. ב-Authentication → Users: ליצור שני משתמשים עם אימייל וסיסמה (Add user, עם Auto Confirm).
+3. כניסה עם Google: ליצור OAuth Client מסוג Web ב-Google Cloud Console, עם Authorized redirect URI `https://<project>.supabase.co/auth/v1/callback`, ולהזין את Client ID ו-Client Secret ב-Authentication → Sign In / Providers → Google.
+4. ב-Authentication → URL Configuration: Site URL ו-Redirect URL הם כתובת האתר ב-GitHub Pages.
+5. ההרשמה נשארת פתוחה. מי שמתחבר ואינו ב-`allowed_users` רואה מסך "עדיין לא הוזמן" ואין לו גישה לנתונים. מזמינים אנשים מהאפליקציה: הגדרות → חברי הבית.
 5. ב-Project Settings → API להעתיק: Project URL, מפתח ה-publishable ומפתח secret (sb_secret_...).
 
 ### 2. GitHub

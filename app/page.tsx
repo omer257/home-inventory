@@ -4,7 +4,7 @@ import type { Session } from "@supabase/supabase-js";
 import { configured, supabase } from "@/lib/supabase";
 import { Item, expiryStatus, isLow } from "@/lib/logic";
 import { useStore } from "@/lib/useStore";
-import Login from "@/components/Login";
+import Login, { NoAccess } from "@/components/Login";
 import ItemForm from "@/components/ItemForm";
 import Settings from "@/components/Settings";
 import { CountView, ExpiringView, InventoryView, ShoppingView } from "@/components/Views";
@@ -16,6 +16,7 @@ export default function Home() {
   const [ready, setReady] = useState(false);
   const [tab, setTab] = useState<Tab>("inv");
   const [editing, setEditing] = useState<Item | null | undefined>(undefined);
+  const [member, setMember] = useState<boolean | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => { setSession(data.session); setReady(true); });
@@ -23,11 +24,19 @@ export default function Home() {
     return () => data.subscription.unsubscribe();
   }, []);
 
-  const store = useStore(Boolean(session));
+  const uid = session?.user.id;
+  useEffect(() => {
+    if (!uid) { setMember(null); return; }
+    supabase.rpc("is_member").then(({ data, error }) => setMember(error ? false : Boolean(data)));
+  }, [uid]);
+
+  const store = useStore(Boolean(session) && member === true);
 
   if (!configured) return <main className="login"><p>חסרות הגדרות Supabase בבנייה.</p></main>;
   if (!ready) return null;
   if (!session) return <Login />;
+  if (member === null) return <main className="login"><p className="empty-state">טוען…</p></main>;
+  if (!member) return <NoAccess email={session.user.email ?? ""} />;
 
   const expCount = store.items.filter((i) => ["expired", "soon", "week"].includes(expiryStatus(i))).length;
   const shopCount = store.items.filter(isLow).length + store.extras.filter((e) => !e.checked).length;

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CSV_COLUMNS, isValidDate, parseCsv, toCsv, todayStr } from "@/lib/logic";
 import { supabase } from "@/lib/supabase";
 import type { Store } from "@/lib/useStore";
@@ -27,7 +27,69 @@ function NamedEditor({ store, table, title }: { store: Store; table: "locations"
   );
 }
 
-type Preview = { rows: Record<string, string>[]; errors: string[]; creates: number; updates: number };
+function Members() {
+  const [list, setList] = useState<string[] | null>(null);
+  const [me, setMe] = useState("");
+  const [email, setEmail] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const [confirm, setConfirm] = useState<string | null>(null);
+
+  async function load() {
+    const [{ data, error }, u] = await Promise.all([
+      supabase.from("allowed_users").select("email").order("email"),
+      supabase.auth.getUser(),
+    ]);
+    if (error) setErr(error.message);
+    setList((data ?? []).map((r) => r.email as string));
+    setMe((u.data.user?.email ?? "").toLowerCase());
+  }
+  useEffect(() => { load(); }, []);
+
+  async function add(e: React.FormEvent) {
+    e.preventDefault();
+    const v = email.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) return setErr("כתובת אימייל לא תקינה");
+    setErr(null);
+    const { error } = await supabase.from("allowed_users").insert({ email: v });
+    if (error) return setErr(error.code === "23505" ? "הכתובת כבר ברשימה" : error.message);
+    setEmail("");
+    load();
+  }
+
+  async function remove(v: string) {
+    if (confirm !== v) return setConfirm(v);
+    setConfirm(null);
+    const { error } = await supabase.from("allowed_users").delete().eq("email", v);
+    if (error) return setErr(error.message);
+    load();
+  }
+
+  return (
+    <div className="card stack">
+      <h3>חברי הבית</h3>
+      <p className="hint">מי שברשימה נכנס עם חשבון Google שלו ורואה את אותו מלאי. מי שלא ברשימה לא רואה כלום.</p>
+      <ul className="list">
+        {(list ?? []).map((m) => (
+          <li key={m} className="row">
+            <span className="row-main"><bdi dir="ltr">{m}</bdi>{m === me && <small> (אני)</small>}</span>
+            {m !== me && (
+              <button className="ghost small" onClick={() => remove(m)}>
+                {confirm === m ? "ללחוץ שוב להסרה" : "הסר"}
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+      <form className="toolbar" onSubmit={add}>
+        <input type="email" dir="ltr" placeholder="name@gmail.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <button>הזמן</button>
+      </form>
+      {err && <p className="error">{err}</p>}
+    </div>
+  );
+}
+
+type Preview ={ rows: Record<string, string>[]; errors: string[]; creates: number; updates: number };
 
 export default function Settings({ store }: { store: Store }) {
   const [preview, setPreview] = useState<Preview | null>(null);
@@ -119,6 +181,7 @@ export default function Settings({ store }: { store: Store }) {
         )}
         {msg && <p className="hint">{msg}</p>}
       </div>
+      <Members />
       <NamedEditor store={store} table="locations" title="מיקומים" />
       <NamedEditor store={store} table="categories" title="קטגוריות" />
       <button className="ghost" onClick={() => supabase.auth.signOut()}>יציאה מהחשבון</button>
