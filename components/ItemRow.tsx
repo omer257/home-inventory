@@ -15,7 +15,7 @@ export default function ItemRow({ item, store, onOpen }: { item: Item; store: St
           {item.opened_at && <small> · פתוח</small>}
         </span>
         <span className="row-meta">
-          <span className={low ? "qty low" : "qty"}>
+          <span className={low ? "qty low" : "qty"} dir="ltr">
             {fmtQty(q)}
             {Number(item.target_quantity) > 0 && <small>/{fmtQty(item.target_quantity)}</small>}
           </span>
