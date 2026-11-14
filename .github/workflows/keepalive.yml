@@ -10,9 +10,9 @@ jobs:
       - name: Query the database
         env:
           URL: ${{ vars.SUPABASE_URL }}
-          KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
         run: |
           code=$(curl -s -o /dev/null -w "%{http_code}" "$URL/rest/v1/items?select=id&limit=1" \
-            -H "apikey: $KEY" -H "Authorization: Bearer $KEY")
+            -H "apikey: $KEY")
           echo "HTTP $code"
           test "$code" = "200"

@@ -11,7 +11,7 @@ async function fetchAll(table) {
   const rows = [];
   for (let from = 0; ; from += 1000) {
     const res = await fetch(`${url}/rest/v1/${table}?select=*&order=${table === "allowed_users" ? "email" : "id"}`, {
-      headers: { apikey: key, Authorization: `Bearer ${key}`, Range: `${from}-${from + 999}` },
+      headers: { apikey: key, Range: `${from}-${from + 999}` },
     });
     if (!res.ok) throw new Error(`${table}: HTTP ${res.status} ${await res.text()}`);
     const page = await res.json();

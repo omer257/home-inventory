@@ -9,14 +9,14 @@
 2. ב-SQL Editor להריץ את `supabase/schema.sql`. בסוף הקובץ להוריד את סימן ההערה מהשורה של `allowed_users` ולשים בה את שתי כתובות האימייל.
 3. ב-Authentication → Sign In / Providers: לכבות את "Allow new users to sign up".
 4. ב-Authentication → Users: ליצור שני משתמשים עם אימייל וסיסמה (Add user, עם Auto Confirm).
-5. ב-Project Settings → API להעתיק: Project URL, המפתח הציבורי (anon/publishable) ומפתח service_role.
+5. ב-Project Settings → API להעתיק: Project URL, מפתח ה-publishable ומפתח secret (sb_secret_...).
 
 ### 2. GitHub
 1. ריפו ציבורי לקוד הזה, וריפו פרטי ריק לגיבויים.
 2. בריפו הציבורי, Settings → Pages: Source = GitHub Actions.
 3. Settings → Secrets and variables → Actions:
    - **Variables:** `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `BACKUP_REPO` (בפורמט `user/repo`)
-   - **Secrets:** `SUPABASE_SERVICE_ROLE_KEY`, `BACKUP_REPO_TOKEN` (טוקן fine-grained עם Contents: Read and write על ריפו הגיבוי בלבד)
+   - **Secrets:** `SUPABASE_SECRET_KEY`, `BACKUP_REPO_TOKEN` (טוקן fine-grained עם Contents: Read and write על ריפו הגיבוי בלבד)
 4. דחיפה ל-main מפעילה את הפריסה. הכתובת: `https://<user>.github.io/<repo>/`
 
 ### 3. בטלפון
