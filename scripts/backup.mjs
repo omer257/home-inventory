@@ -30,7 +30,7 @@ for (const t of tables) {
 
 const loc = new Map(data.locations.map((r) => [r.id, r.name]));
 const cat = new Map(data.categories.map((r) => [r.id, r.name]));
-const cols = ["name", "category", "location", "quantity", "target_quantity", "package_size", "expiry_date", "notes"];
+const cols = ["name", "category", "location", "quantity", "target_quantity", "package_size", "expiry_date", "open_shelf_days", "notes"];
 const cell = (v) => {
   const s = v == null ? "" : String(v);
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;

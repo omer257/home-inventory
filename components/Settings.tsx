@@ -126,6 +126,7 @@ export default function Settings({ store }: { store: Store }) {
         if (r[f] && !(Number(r[f]) >= 0)) errors.push(`שורה ${line}: ${f} לא מספר`);
       }
       if (r.expiry_date && !isValidDate(r.expiry_date)) errors.push(`שורה ${line}: תאריך לא בפורמט YYYY-MM-DD`);
+      if (r.open_shelf_days && !(Number.isInteger(Number(r.open_shelf_days)) && Number(r.open_shelf_days) > 0)) errors.push(`שורה ${line}: open_shelf_days צריך להיות מספר ימים שלם`);
     });
     const existing = new Set(store.items.map((i) => i.name.toLowerCase()));
     const updates = rows.filter((r) => existing.has((r.name || "").toLowerCase())).length;
@@ -146,6 +147,7 @@ export default function Settings({ store }: { store: Store }) {
       if (r.target_quantity) data.target_quantity = Number(r.target_quantity);
       if (r.package_size) data.package_size = r.package_size;
       if (r.expiry_date) data.expiry_date = r.expiry_date;
+      if (r.open_shelf_days) data.open_shelf_days = Number(r.open_shelf_days);
       if (r.notes) data.notes = r.notes;
       const ex = store.items.find((i) => i.name.toLowerCase() === r.name.trim().toLowerCase());
       const res = ex

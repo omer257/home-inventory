@@ -30,8 +30,8 @@
 אפשר להריץ את שתיהן ידנית מלשונית Actions.
 
 ## ייבוא CSV
-עמודות: `name,category,location,quantity,target_quantity,package_size,expiry_date,notes`.
-תאריך בפורמט `YYYY-MM-DD`. שורה עם שם שכבר קיים מעדכנת את הפריט. קטגוריה או מיקום שלא קיימים נוצרים בייבוא. דוגמה: `sample.csv`.
+עמודות: `name,category,location,quantity,target_quantity,package_size,expiry_date,open_shelf_days,notes`.
+תאריך בפורמט `YYYY-MM-DD`. `open_shelf_days` הוא מספר הימים שהפריט טוב אחרי פתיחה. שורה עם שם שכבר קיים מעדכנת את הפריט. קטגוריה או מיקום שלא קיימים נוצרים בייבוא. דוגמה: `sample.csv`.
 
 ## פיתוח מקומי
 ```

@@ -104,6 +104,7 @@ export const CSV_COLUMNS = [
   "target_quantity",
   "package_size",
   "expiry_date",
+  "open_shelf_days",
   "notes",
 ] as const;
 
