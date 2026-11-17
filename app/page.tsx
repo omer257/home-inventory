@@ -8,8 +8,9 @@ import Login, { NoAccess } from "@/components/Login";
 import ItemForm from "@/components/ItemForm";
 import Settings from "@/components/Settings";
 import { CountView, ExpiringView, InventoryView, ShoppingView } from "@/components/Views";
+import RecipesView from "@/components/Recipes";
 
-type Tab = "inv" | "exp" | "shop" | "count" | "set";
+type Tab = "inv" | "exp" | "shop" | "rec" | "count" | "set";
 
 export default function Home() {
   const [session, setSession] = useState<Session | null>(null);
@@ -17,6 +18,7 @@ export default function Home() {
   const [tab, setTab] = useState<Tab>("inv");
   const [editing, setEditing] = useState<Item | null | undefined>(undefined);
   const [member, setMember] = useState<boolean | null>(null);
+  const [recipeFocus, setRecipeFocus] = useState<Item | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => { setSession(data.session); setReady(true); });
@@ -45,14 +47,14 @@ export default function Home() {
     { id: "inv", label: "מלאי" },
     { id: "exp", label: "פג בקרוב", badge: expCount },
     { id: "shop", label: "קניות", badge: shopCount },
-    { id: "count", label: "ספירה" },
+    { id: "rec", label: "מתכונים" },
     { id: "set", label: "הגדרות" },
   ];
 
   return (
     <>
       <header className="top">
-        <h1>{tabs.find((t) => t.id === tab)?.label}</h1>
+        <h1>{tab === "count" ? "ספירה" : tabs.find((t) => t.id === tab)?.label}</h1>
       </header>
       <main className="content">
         {store.error && (
@@ -60,8 +62,12 @@ export default function Home() {
         )}
         {store.loading ? <p className="empty-state">טוען…</p> : (
           <>
-            {tab === "inv" && <InventoryView store={store} onOpen={setEditing} />}
-            {tab === "exp" && <ExpiringView store={store} onOpen={setEditing} />}
+            {tab === "inv" && <InventoryView store={store} onOpen={setEditing} onCount={() => setTab("count")} />}
+            {tab === "exp" && (
+              <ExpiringView store={store} onOpen={setEditing}
+                onRecipes={(i) => { setRecipeFocus(i); setTab("rec"); }} />
+            )}
+            {tab === "rec" && <RecipesView store={store} focus={recipeFocus} clearFocus={() => setRecipeFocus(null)} />}
             {tab === "shop" && <ShoppingView store={store} onOpen={setEditing} />}
             {tab === "count" && <CountView store={store} />}
             {tab === "set" && <Settings store={store} />}
@@ -76,7 +82,8 @@ export default function Home() {
       )}
       <nav className="tabs">
         {tabs.map((t) => (
-          <button key={t.id} className={tab === t.id ? "on" : ""} onClick={() => setTab(t.id)}>
+          <button key={t.id} className={tab === t.id || (t.id === "inv" && tab === "count") ? "on" : ""}
+            onClick={() => { if (t.id === "rec") setRecipeFocus(null); setTab(t.id); }}>
             {t.label}
             {!!t.badge && <span className="count">{t.badge}</span>}
           </button>

@@ -102,3 +102,30 @@ input[type="date"] { min-width: 0; max-width: 100%; }
 .login h1 { text-align: center; margin-bottom: 16px; }
 .count h2 { font-size: 26px; }
 .file input { padding: 8px; }
+
+/* recipes */
+textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); font: inherit; color: var(--text); resize: vertical; }
+.google-link { display: block; margin: 6px 0 10px; padding: 10px 12px; border: 1px dashed var(--accent); border-radius: 10px; color: var(--accent); text-decoration: none; font-size: 14px; }
+.focus-bar { display: flex; justify-content: space-between; align-items: center; background: var(--accent-soft); border-radius: 10px; padding: 6px 10px; margin: 6px 0; }
+.recipe-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.recipe-card { display: flex; gap: 10px; width: 100%; text-align: start; padding: 8px; align-items: center; border-radius: var(--radius); }
+.recipe-card img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; flex-shrink: 0; background: var(--line); }
+.recipe-body { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.recipe-title { font-weight: 600; }
+.recipe-meta { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 14px; }
+.pct { background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 1px 8px; font-size: 13px; }
+.pct.full { background: var(--accent); color: #fff; }
+.stars { color: #b7791f; font-size: 14px; }
+.uses { font-size: 13px; color: var(--orange); }
+.recipe-hero { width: 100%; max-height: 220px; object-fit: cover; border-radius: 12px; }
+.recipe-detail h3 { margin: 6px 0 0; }
+.ing-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ing { display: flex; gap: 8px; align-items: baseline; }
+.ing .mark { width: 18px; text-align: center; font-weight: 700; flex-shrink: 0; }
+.ing.have .mark { color: var(--accent); }
+.ing.out .mark, .ing.none .mark { color: var(--red); }
+.ing-text { flex: 1; }
+.ing-head { font-weight: 600; margin-top: 6px; }
+.steps { margin: 0; padding-inline-start: 20px; display: flex; flex-direction: column; gap: 8px; }
+.check-row { flex-direction: row; align-items: center; gap: 10px; color: var(--text); font-size: 16px; }
+.check-row input { width: 20px; height: 20px; }

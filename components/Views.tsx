@@ -5,6 +5,7 @@ import {
 } from "@/lib/logic";
 import type { Store } from "@/lib/useStore";
 import ItemRow from "./ItemRow";
+import { googleRecipeSearch } from "@/lib/recipes";
 
 function groupBy(items: Item[], groups: Named[], key: "location_id" | "category_id") {
   const out: { title: string; items: Item[] }[] = groups.map((g) => ({
@@ -18,7 +19,7 @@ function groupBy(items: Item[], groups: Named[], key: "location_id" | "category_
 
 /* ---------- Inventory ---------- */
 
-export function InventoryView({ store, onOpen }: { store: Store; onOpen: (i: Item | null) => void }) {
+export function InventoryView({ store, onOpen, onCount }: { store: Store; onOpen: (i: Item | null) => void; onCount: () => void }) {
   const [q, setQ] = useState("");
   const [by, setBy] = useState<"location_id" | "category_id">("location_id");
   const [filter, setFilter] = useState<"all" | "low" | "exp">("all");
@@ -39,6 +40,7 @@ export function InventoryView({ store, onOpen }: { store: Store; onOpen: (i: Ite
     <section>
       <div className="toolbar">
         <input className="search" placeholder="חיפוש" value={q} onChange={(e) => setQ(e.target.value)} />
+        <button onClick={onCount}>ספירה</button>
         <button className="primary" onClick={() => onOpen(null)}>+ פריט</button>
       </div>
       <div className="chips">
@@ -66,7 +68,7 @@ export function InventoryView({ store, onOpen }: { store: Store; onOpen: (i: Ite
 
 /* ---------- Expiring ---------- */
 
-export function ExpiringView({ store, onOpen }: { store: Store; onOpen: (i: Item) => void }) {
+export function ExpiringView({ store, onOpen, onRecipes }: { store: Store; onOpen: (i: Item) => void; onRecipes: (i: Item) => void }) {
   const list = store.items
     .filter((i) => ["expired", "soon", "week"].includes(expiryStatus(i)))
     .sort((a, b) => (effectiveExpiry(a) ?? "").localeCompare(effectiveExpiry(b) ?? ""));
@@ -74,6 +76,10 @@ export function ExpiringView({ store, onOpen }: { store: Store; onOpen: (i: Item
   if (!list.length) return <p className="empty-state">אין פריטים שפגים בשבוע הקרוב.</p>;
 
   return (
+    <>
+    <a className="google-link" href={googleRecipeSearch(list.map((i) => i.name))} target="_blank" rel="noopener noreferrer">
+      חיפוש בגוגל: מתכון עם {list.slice(0, 3).map((i) => i.name).join(", ")}
+    </a>
     <ul className="list">
       {list.map((i) => {
         const q = Number(i.quantity);
@@ -89,11 +95,13 @@ export function ExpiringView({ store, onOpen }: { store: Store; onOpen: (i: Item
               {!i.opened_at && (
                 <button onClick={() => store.setQuantity(i, q, "edit", { opened_at: todayStr() }, `${i.name}: נפתח`)}>פתחתי</button>
               )}
+              <button onClick={() => onRecipes(i)}>מתכונים</button>
             </div>
           </li>
         );
       })}
     </ul>
+    </>
   );
 }
 

@@ -23,6 +23,9 @@
 ### 3. בטלפון
 לפתוח את הכתובת ולהוסיף למסך הבית: באייפון דרך Safari → שיתוף → הוספה למסך הבית, ובאנדרואיד דרך Chrome → התקנת אפליקציה.
 
+## מתכונים
+ייבוא מקישור עובר דרך פונקציית Edge בשם `import-recipe` (`supabase/functions/import-recipe`). פורסים אותה מה-Dashboard של Supabase (Edge Functions → Deploy a new function → Via Editor) או עם `supabase functions deploy import-recipe`. היא מוודאת שהקורא חבר במשק הבית, ומחזירה את נתוני ה-schema.org/Recipe של הדף.
+
 ## פעולות מתוזמנות
 - **keepalive.yml:** כל 3 ימים מעדכן חותמת זמן בטבלת `heartbeat`, כדי ש-Supabase לא ישהה את הפרויקט. משתמש במפתח הציבורי בלבד.
 - **backup.yml:** בכל יום ראשון מייצא את כל הטבלאות ל-JSON ואת הפריטים ל-CSV, ושומר אותם בריפו הפרטי.

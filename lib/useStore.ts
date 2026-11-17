@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "./supabase";
 import type { Extra, Item, Named } from "./logic";
+import type { Recipe } from "./recipes";
 
 type Reason = "use" | "buy" | "count" | "edit" | "discard";
 
@@ -12,6 +13,7 @@ export function useStore(enabled: boolean) {
   const [locations, setLocations] = useState<Named[]>([]);
   const [categories, setCategories] = useState<Named[]>([]);
   const [extras, setExtras] = useState<Extra[]>([]);
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<Toast>(null);
@@ -24,19 +26,21 @@ export function useStore(enabled: boolean) {
   }, []);
 
   const reload = useCallback(async () => {
-    const [i, l, c, e] = await Promise.all([
+    const [i, l, c, e, r] = await Promise.all([
       supabase.from("items").select("*").order("name"),
       supabase.from("locations").select("*").order("sort_order"),
       supabase.from("categories").select("*").order("sort_order"),
       supabase.from("shopping_extras").select("*").order("created_at"),
+      supabase.from("recipes").select("*").order("created_at", { ascending: false }),
     ]);
-    const err = i.error || l.error || c.error || e.error;
+    const err = i.error || l.error || c.error || e.error || r.error;
     if (err) setError(err.message);
     else setError(null);
     if (i.data) setItems(i.data as Item[]);
     if (l.data) setLocations(l.data as Named[]);
     if (c.data) setCategories(c.data as Named[]);
     if (e.data) setExtras(e.data as Extra[]);
+    if (r.data) setRecipes(r.data as Recipe[]);
     setLoading(false);
   }, []);
 
@@ -54,6 +58,7 @@ export function useStore(enabled: boolean) {
       .on("postgres_changes", { event: "*", schema: "public", table: "shopping_extras" }, debounced)
       .on("postgres_changes", { event: "*", schema: "public", table: "locations" }, debounced)
       .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, debounced)
+      .on("postgres_changes", { event: "*", schema: "public", table: "recipes" }, debounced)
       .subscribe();
     const onFocus = () => reload();
     window.addEventListener("focus", onFocus);
@@ -169,7 +174,62 @@ export function useStore(enabled: boolean) {
     return ins.data ? (ins.data.id as number) : null;
   }, []);
 
+  const saveRecipe = useCallback(
+    async (data: Partial<Recipe>, id?: number) => {
+      const res = id
+        ? await supabase.from("recipes").update(data).eq("id", id).select("id").single()
+        : await supabase.from("recipes").insert(data).select("id").single();
+      if (res.error) {
+        setError(res.error.code === "23505" ? "המתכון הזה כבר בספרייה" : res.error.message);
+        return null;
+      }
+      await reload();
+      return res.data.id as number;
+    },
+    [reload]
+  );
+
+  const deleteRecipe = useCallback(
+    async (id: number) => {
+      const { error } = await supabase.from("recipes").delete().eq("id", id);
+      if (error) return fail(error.message);
+      reload();
+    },
+    [reload]
+  );
+
+  /** Take one of each chosen item out of stock and count the recipe as cooked. */
+  const markCooked = useCallback(
+    async (recipe: Recipe, used: Item[]) => {
+      for (const it of used) {
+        const q = Math.max(0, Number(it.quantity) - 1);
+        const { error } = await supabase.from("items").update({ quantity: q }).eq("id", it.id);
+        if (error) return fail(error.message);
+        await supabase.from("stock_log").insert({ item_id: it.id, delta: q - Number(it.quantity), reason: "use" });
+      }
+      await supabase
+        .from("recipes")
+        .update({ cooked_count: recipe.cooked_count + 1, last_cooked_at: new Date().toISOString() })
+        .eq("id", recipe.id);
+      await reload();
+      showToast({ text: used.length ? `עודכן מלאי של ${used.length} פריטים` : "סומן כמבושל" });
+    },
+    [reload, showToast]
+  );
+
+  const addExtras = useCallback(
+    async (names: string[]) => {
+      if (!names.length) return;
+      const { error } = await supabase.from("shopping_extras").insert(names.map((name) => ({ name, quantity: 1 })));
+      if (error) return fail(error.message);
+      reload();
+      showToast({ text: `נוספו ${names.length} לרשימת הקניות` });
+    },
+    [reload, showToast]
+  );
+
   return {
+    recipes, saveRecipe, deleteRecipe, markCooked, addExtras,
     items, locations, categories, extras, loading, error, setError, toast, setToast, showToast,
     reload, setQuantity, saveItem, deleteItem, addExtra, toggleExtra, clearCheckedExtras,
     saveNamed, deleteNamed, ensureNamed,
