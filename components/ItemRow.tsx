@@ -19,6 +19,7 @@ export default function ItemRow({ item, store, onOpen }: { item: Item; store: St
             {fmtQty(q)}
             {Number(item.target_quantity) > 0 && <small>/{fmtQty(item.target_quantity)}</small>}
           </span>
+          {item.cook_soon && q > 0 && <span className="badge cook">לבשל</span>}
           {st !== "none" && st !== "ok" && <span className={`badge ${st}`}>{expiryLabel(item)}</span>}
         </span>
       </button>

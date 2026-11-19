@@ -30,6 +30,7 @@ export type RecipeMatch = {
   total: number;
   have: number;
   pct: number;
+  /** Items in stock that this recipe uses and that should go first: expiring soon or marked "want to cook". */
   expiring: Item[];
   score: number;
 };
@@ -38,6 +39,9 @@ export function norm(s: string): string {
   return s
     .toLowerCase()
     .replace(/[֑-ׇ]/g, "") // niqqud
+    .replace(/[ךםןףץ]/g, (c) => ({ ך: "כ", ם: "מ", ן: "נ", ף: "פ", ץ: "צ" })[c] as string)
+    .replace(/יי/g, "י")
+    .replace(/וו/g, "ו")
     .replace(/[^\p{L}\p{N}]+/gu, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -70,19 +74,59 @@ function contains(hay: string, term: string): boolean {
   }
 }
 
+/** Singular/plural forms of one Hebrew word: לימון ↔ לימונים, עגבניה ↔ עגבניות, שקית ↔ שקיות. */
+function wordForms(w: string): string[] {
+  if (w.length < 3) return [];
+  const out: string[] = [];
+  if (w.endsWith("ימ")) { const st = w.slice(0, -2); out.push(st, st + "ה"); }
+  else if (w.endsWith("ות")) { const st = w.slice(0, -2); out.push(st + "ה", st + "ת", st); }
+  else if (w.endsWith("ה")) { const st = w.slice(0, -1); out.push(st + "ות", st + "ימ"); }
+  else if (w.endsWith("ת")) { const st = w.slice(0, -1); out.push(st + "ות"); }
+  else if (w.endsWith("י") && w.length >= 4) { const st = w.slice(0, -1); out.push(st, st + "ימ"); }
+  else out.push(w + "ימ", w + "ות", w + "י");
+  return out.filter((x) => x.length >= 2 && x !== w);
+}
+
+function termForms(term: string): string[] {
+  const words = term.split(" ");
+  const forms: string[] = [];
+  if (words.length > 1 && words.length <= 3) {
+    // Every word changed together: "עגבניות מרוסקות" ↔ "עגבניה מרוסקת".
+    let combos: string[][] = [[]];
+    for (const w of words) {
+      const opts = wordForms(w);
+      combos = combos.flatMap((c) => (opts.length ? opts : [w]).map((o) => [...c, o]));
+    }
+    for (const c of combos) forms.push(c.join(" "));
+  }
+  words.forEach((w, i) => {
+    for (const f of wordForms(w)) {
+      const copy = [...words];
+      copy[i] = f;
+      forms.push(copy.join(" "));
+    }
+  });
+  return forms;
+}
+
 export function matchLine(line: string, items: Item[]): LineMatch {
   const n = norm(line);
   let best: Item | null = null;
   let bestLen = 0;
+  let partial = false;
+  // Longest match wins; on a tie an exact name beats a singular/plural form.
   for (const it of items) {
     for (const t of terms(it)) {
-      if (t.length > bestLen && contains(n, t)) {
-        best = it;
-        bestLen = t.length;
+      if (contains(n, t) && (t.length > bestLen || (t.length === bestLen && partial))) {
+        best = it; bestLen = t.length; partial = false;
+      }
+      for (const f of termForms(t)) {
+        if (f.length > bestLen && contains(n, f)) {
+          best = it; bestLen = f.length; partial = true;
+        }
       }
     }
   }
-  let partial = false;
   if (!best) {
     // Fall back to the first word of an item's name: "אורז" in a recipe matches "אורז בסמטי".
     const cands = items.filter((it) => {
@@ -98,6 +142,25 @@ export function matchLine(line: string, items: Item[]): LineMatch {
   return { line, item: best, state, partial };
 }
 
+const UNITS = new Set(("כוס כוסות כף כפות כפית כפיות גרם גר ג קג קילו ליטר ליטרים מל מיליליטר חבילה חבילות קופסה קופסת קופסאות "
+  + "יחידה יחידות חצי רבע שליש שלושה רבעי קורט חופן צרור צרורות פרוסה פרוסות שן שיני מיכל מיכלים פחית שקית "
+  + "לפי הטעם קצוץ קצוצה קצוצים קצוצות טרי טרייה טריים מגורר מגוררת פרוס פרוסים כתוש כתושה גדול גדולה גדולים קטן קטנה בינוני בינונית "
+  + "או ועוד לקישוט להגשה כ אחד אחת שתי שני שלוש ארבע חמש").split(" "));
+
+const UNITS_N = new Set([...UNITS].map((u) => norm(u)));
+
+/** The ingredient's name without amounts and units, in its own spelling: "2 כוסות קינואה שטופה" → "קינואה שטופה". */
+export function ingredientName(line: string): string {
+  const words = line
+    .replace(/[^\p{L}\p{N}\s'"]/gu, " ")
+    .split(/\s+/)
+    .filter((w) => {
+      const n = norm(w).replace(/ /g, "");
+      return n.length > 1 && !/^\d/.test(n) && !UNITS_N.has(n);
+    });
+  return words.slice(0, 3).join(" ");
+}
+
 export function matchRecipe(r: Recipe, items: Item[]): RecipeMatch {
   const lines = r.ingredients.filter((l) => l.trim() && !isHeading(l)).map((l) => matchLine(l, items));
   const total = lines.length;
@@ -107,7 +170,7 @@ export function matchRecipe(r: Recipe, items: Item[]): RecipeMatch {
   const expiring: Item[] = [];
   for (const l of lines) {
     if (l.state !== "have" || !l.item || seen.has(l.item.id)) continue;
-    if (["expired", "soon", "week"].includes(expiryStatus(l.item))) {
+    if (l.item.cook_soon || ["expired", "soon", "week"].includes(expiryStatus(l.item))) {
       expiring.push(l.item);
       seen.add(l.item.id);
     }

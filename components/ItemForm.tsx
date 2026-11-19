@@ -18,6 +18,7 @@ export default function ItemForm({ store, item, defaults, onClose }: Props) {
   const [shelf, setShelf] = useState(base.open_shelf_days ? String(base.open_shelf_days) : "");
   const [aliases, setAliases] = useState((base.aliases ?? []).join(", "));
   const [notes, setNotes] = useState(base.notes ?? "");
+  const [cookSoon, setCookSoon] = useState(Boolean(base.cook_soon));
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -46,6 +47,7 @@ export default function ItemForm({ store, item, defaults, onClose }: Props) {
       open_shelf_days: shelf ? Number(shelf) : null,
       aliases: aliases.split(",").map((s) => s.trim()).filter(Boolean),
       notes: notes.trim() || null,
+      cook_soon: cookSoon,
     };
     const ok = await store.saveItem(data, item?.id);
     setBusy(false);
@@ -98,6 +100,10 @@ export default function ItemForm({ store, item, defaults, onClose }: Props) {
         </div>
         <label>שמות נוספים (מופרדים בפסיק)<input value={aliases} onChange={(e) => setAliases(e.target.value)} /></label>
         <label>הערות<input value={notes} onChange={(e) => setNotes(e.target.value)} /></label>
+        <label className="check-row">
+          <input type="checkbox" checked={cookSoon} onChange={(e) => setCookSoon(e.target.checked)} />
+          <span>רוצה לבשל בקרוב <small>(מקדם מתכונים שמשתמשים בו)</small></span>
+        </label>
         <p className="hint">כמות רצויה 0 אומרת שהפריט לא ייכנס לרשימת הקניות אוטומטית.</p>
         {(err || store.error) && <p className="error">{err || store.error}</p>}
         <div className="actions">

@@ -1,16 +1,16 @@
 "use client";
 import { useMemo, useState } from "react";
 import { Item, expiryLabel, expiryStatus } from "@/lib/logic";
-import { Recipe, RecipeMatch, googleRecipeSearch, isIngredientHeading, matchRecipe, parseRecipeText } from "@/lib/recipes";
+import { LineMatch, Recipe, RecipeMatch, googleRecipeSearch, ingredientName, isIngredientHeading, matchRecipe, norm, parseRecipeText } from "@/lib/recipes";
 import { supabase } from "@/lib/supabase";
 import type { Store } from "@/lib/useStore";
 
 type Sort = "cook" | "pct" | "rating" | "new";
 
-function expiringItems(items: Item[]) {
+function priorityItems(items: Item[]) {
   return items
-    .filter((i) => ["expired", "soon", "week"].includes(expiryStatus(i)))
-    .sort((a, b) => (a.expiry_date ?? "").localeCompare(b.expiry_date ?? ""));
+    .filter((i) => Number(i.quantity) > 0 && (i.cook_soon || ["expired", "soon", "week"].includes(expiryStatus(i))))
+    .sort((a, b) => (a.expiry_date ?? "9999").localeCompare(b.expiry_date ?? "9999"));
 }
 
 function Stars({ r }: { r: Recipe }) {
@@ -50,7 +50,7 @@ export default function RecipesView({ store, focus, clearFocus }: { store: Store
     return [...xs].sort(by[sort]);
   }, [matched, q, sort, focus]);
 
-  const expiring = expiringItems(store.items);
+  const expiring = priorityItems(store.items);
   const searchNames = focus ? [focus.name] : expiring.map((i) => i.name);
   const open = openId != null ? matched.find(({ r }) => r.id === openId) : null;
 
@@ -102,7 +102,7 @@ export default function RecipesView({ store, focus, clearFocus }: { store: Store
                   {r.total_time && <small>{r.total_time}</small>}
                 </span>
                 {m.expiring.length > 0 && (
-                  <span className="uses">משתמש ב: {m.expiring.map((i) => i.name).join(", ")}</span>
+                  <span className="uses">מנצל: {m.expiring.map((i) => i.name).join(", ")}</span>
                 )}
               </span>
             </button>
@@ -285,6 +285,7 @@ function RecipeDetail({ store, recipe, match, onClose, onEdit }: {
 }) {
   const [cooking, setCooking] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [linking, setLinking] = useState<LineMatch | null>(null);
 
   const lineState = new Map(match.lines.map((l) => [l.line, l]));
   const missing = match.lines.filter((l) => l.state !== "have");
@@ -332,6 +333,10 @@ function RecipeDetail({ store, recipe, match, onClose, onEdit }: {
                   {m?.item && <small> · {m.item.name}{m.partial ? "?" : ""}{st === "out" ? " (נגמר)" : ""}</small>}
                 </span>
                 {m?.item && ["expired", "soon", "week"].includes(exp) && <span className={`badge ${exp}`}>{expiryLabel(m.item)}</span>}
+                {m?.item?.cook_soon && st === "have" && <span className="badge cook">לבשל</span>}
+                {m && (st === "none" || m.partial) && (
+                  <button className="ghost small" onClick={() => setLinking(m)}>{st === "none" ? "קשר" : "תקן"}</button>
+                )}
               </li>
             );
           })}
@@ -366,6 +371,7 @@ function RecipeDetail({ store, recipe, match, onClose, onEdit }: {
         {cooking && (
           <Cooked store={store} recipe={recipe} match={match} onDone={() => setCooking(false)} />
         )}
+        {linking && <LinkIngredient store={store} match={linking} onDone={() => setLinking(null)} />}
       </div>
     </div>
   );
@@ -401,6 +407,59 @@ function Cooked({ store, recipe, match, onDone }: { store: Store; recipe: Recipe
           setBusy(false);
           onDone();
         }}>עדכן מלאי</button>
+        <button className="ghost" onClick={onDone}>ביטול</button>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- Link an ingredient to an inventory item ---------- */
+
+function LinkIngredient({ store, match, onDone }: { store: Store; match: LineMatch; onDone: () => void }) {
+  const [alias, setAlias] = useState(ingredientName(match.line));
+  const [q, setQ] = useState("");
+  const [picked, setPicked] = useState<Item | null>(match.partial ? match.item : null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const options = useMemo(() => {
+    const s = q.trim();
+    const xs = s ? store.items.filter((i) => i.name.includes(s) || i.aliases.some((a) => a.includes(s))) : store.items;
+    return xs.slice(0, 40);
+  }, [q, store.items]);
+
+  async function save() {
+    if (!picked) return setErr("צריך לבחור פריט");
+    const a = alias.trim();
+    if (!a) return setErr("חסר שם");
+    setBusy(true);
+    const exists = [picked.name, ...picked.aliases].some((x) => norm(x) === norm(a));
+    const ok = exists ? true : await store.saveItem({ aliases: [...picked.aliases, a] }, picked.id);
+    setBusy(false);
+    if (ok) onDone();
+  }
+
+  return (
+    <div className="card stack">
+      <h3>לקשר את "{match.line}" לפריט במלאי</h3>
+      <label>השם שיזוהה מעכשיו
+        <input value={alias} onChange={(e) => setAlias(e.target.value)} />
+      </label>
+      <input placeholder="חיפוש פריט" value={q} onChange={(e) => setQ(e.target.value)} />
+      <ul className="list pick-list">
+        {options.map((i) => (
+          <li key={i.id} className={`row ${picked?.id === i.id ? "picked" : ""}`}>
+            <button className="row-main" onClick={() => setPicked(i)}>
+              <span className="row-name">{i.name}</span>
+              {picked?.id === i.id && <span className="qty">✓</span>}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className="hint">השם יישמר כשם נרדף של הפריט, ויזוהה בכל המתכונים.</p>
+      {(err || store.error) && <p className="error">{err || store.error}</p>}
+      <div className="actions">
+        <button className="primary" disabled={busy} onClick={save}>שמור קישור</button>
         <button className="ghost" onClick={onDone}>ביטול</button>
       </div>
     </div>

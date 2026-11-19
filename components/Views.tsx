@@ -22,7 +22,7 @@ function groupBy(items: Item[], groups: Named[], key: "location_id" | "category_
 export function InventoryView({ store, onOpen, onCount }: { store: Store; onOpen: (i: Item | null) => void; onCount: () => void }) {
   const [q, setQ] = useState("");
   const [by, setBy] = useState<"location_id" | "category_id">("location_id");
-  const [filter, setFilter] = useState<"all" | "low" | "exp">("all");
+  const [filter, setFilter] = useState<"all" | "low" | "exp" | "cook">("all");
 
   const filtered = useMemo(() => {
     const s = q.trim();
@@ -30,6 +30,7 @@ export function InventoryView({ store, onOpen, onCount }: { store: Store; onOpen
       if (s && !i.name.includes(s) && !i.aliases.some((a) => a.includes(s))) return false;
       if (filter === "low") return isLow(i);
       if (filter === "exp") return ["expired", "soon", "week"].includes(expiryStatus(i));
+      if (filter === "cook") return Boolean(i.cook_soon);
       return true;
     });
   }, [store.items, q, filter]);
@@ -50,6 +51,7 @@ export function InventoryView({ store, onOpen, onCount }: { store: Store; onOpen
         <button className={filter === "all" ? "on" : ""} onClick={() => setFilter("all")}>הכול</button>
         <button className={filter === "low" ? "on" : ""} onClick={() => setFilter("low")}>חסר</button>
         <button className={filter === "exp" ? "on" : ""} onClick={() => setFilter("exp")}>פג בקרוב</button>
+        <button className={filter === "cook" ? "on" : ""} onClick={() => setFilter("cook")}>לבשל</button>
       </div>
       {groups.length === 0 && (
         <p className="empty-state">{store.items.length ? "אין תוצאות" : "אין עדיין פריטים. אפשר להוסיף ידנית או לייבא CSV בהגדרות."}</p>
@@ -70,10 +72,10 @@ export function InventoryView({ store, onOpen, onCount }: { store: Store; onOpen
 
 export function ExpiringView({ store, onOpen, onRecipes }: { store: Store; onOpen: (i: Item) => void; onRecipes: (i: Item) => void }) {
   const list = store.items
-    .filter((i) => ["expired", "soon", "week"].includes(expiryStatus(i)))
-    .sort((a, b) => (effectiveExpiry(a) ?? "").localeCompare(effectiveExpiry(b) ?? ""));
+    .filter((i) => ["expired", "soon", "week"].includes(expiryStatus(i)) || (i.cook_soon && Number(i.quantity) > 0))
+    .sort((a, b) => (effectiveExpiry(a) ?? "9999").localeCompare(effectiveExpiry(b) ?? "9999"));
 
-  if (!list.length) return <p className="empty-state">אין פריטים שפגים בשבוע הקרוב.</p>;
+  if (!list.length) return <p className="empty-state">אין פריטים שפגים בשבוע הקרוב או שסומנו "לבשל".</p>;
 
   return (
     <>
@@ -87,7 +89,10 @@ export function ExpiringView({ store, onOpen, onRecipes }: { store: Store; onOpe
           <li key={i.id} className="row column">
             <button className="row-main" onClick={() => onOpen(i)}>
               <span className="row-name">{i.name} <small>· {fmtQty(q)}</small></span>
-              <span className={`badge ${expiryStatus(i)}`}>{expiryLabel(i)}</span>
+              <span className="row-meta">
+                {i.cook_soon && <span className="badge cook">לבשל</span>}
+                {expiryStatus(i) !== "none" && expiryStatus(i) !== "ok" && <span className={`badge ${expiryStatus(i)}`}>{expiryLabel(i)}</span>}
+              </span>
             </button>
             <div className="actions small">
               <button onClick={() => store.setQuantity(i, q - 1, "use", {}, `${i.name}: השתמשתי`)}>השתמשתי</button>
@@ -95,6 +100,9 @@ export function ExpiringView({ store, onOpen, onRecipes }: { store: Store; onOpe
               {!i.opened_at && (
                 <button onClick={() => store.setQuantity(i, q, "edit", { opened_at: todayStr() }, `${i.name}: נפתח`)}>פתחתי</button>
               )}
+              <button onClick={() => store.setQuantity(i, q, "edit", { cook_soon: !i.cook_soon }, i.cook_soon ? `${i.name}: הוסר מ"לבשל"` : `${i.name}: סומן "לבשל"`)}>
+                {i.cook_soon ? "בטל לבשל" : "לבשל"}
+              </button>
               <button onClick={() => onRecipes(i)}>מתכונים</button>
             </div>
           </li>

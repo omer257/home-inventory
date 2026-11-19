@@ -77,7 +77,7 @@ export function useStore(enabled: boolean) {
   const setQuantity = useCallback(
     async (item: Item, newQty: number, reason: Reason, extra: Partial<Item> = {}, label?: string) => {
       const q = Math.max(0, Math.round(newQty * 100) / 100);
-      const prev = { quantity: item.quantity, expiry_date: item.expiry_date, opened_at: item.opened_at };
+      const prev = { quantity: item.quantity, expiry_date: item.expiry_date, opened_at: item.opened_at, cook_soon: Boolean(item.cook_soon) };
       setItems((xs) => xs.map((x) => (x.id === item.id ? { ...x, ...extra, quantity: q } : x)));
       const { error } = await supabase.from("items").update({ ...extra, quantity: q }).eq("id", item.id);
       if (error) return fail(error.message);

@@ -11,6 +11,7 @@ export type Item = {
   opened_at: string | null;
   open_shelf_days: number | null;
   notes: string | null;
+  cook_soon?: boolean;
   updated_at: string;
 };
 

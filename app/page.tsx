@@ -40,12 +40,12 @@ export default function Home() {
   if (member === null) return <main className="login"><p className="empty-state">טוען…</p></main>;
   if (!member) return <NoAccess email={session.user.email ?? ""} />;
 
-  const expCount = store.items.filter((i) => ["expired", "soon", "week"].includes(expiryStatus(i))).length;
+  const expCount = store.items.filter((i) => ["expired", "soon", "week"].includes(expiryStatus(i)) || (i.cook_soon && Number(i.quantity) > 0)).length;
   const shopCount = store.items.filter(isLow).length + store.extras.filter((e) => !e.checked).length;
 
   const tabs: { id: Tab; label: string; badge?: number }[] = [
     { id: "inv", label: "מלאי" },
-    { id: "exp", label: "פג בקרוב", badge: expCount },
+    { id: "exp", label: "לבשל", badge: expCount },
     { id: "shop", label: "קניות", badge: shopCount },
     { id: "rec", label: "מתכונים" },
     { id: "set", label: "הגדרות" },
@@ -54,7 +54,7 @@ export default function Home() {
   return (
     <>
       <header className="top">
-        <h1>{tab === "count" ? "ספירה" : tabs.find((t) => t.id === tab)?.label}</h1>
+        <h1>{tab === "count" ? "ספירה" : tab === "exp" ? "לבשל קודם" : tabs.find((t) => t.id === tab)?.label}</h1>
       </header>
       <main className="content">
         {store.error && (

@@ -162,3 +162,6 @@ create policy members_all on recipes for all to authenticated using (is_member()
 do $$ begin
   begin alter publication supabase_realtime add table recipes; exception when others then null; end;
 end $$;
+
+-- Items the household wants to use soon; recipes that use them rank higher.
+alter table items add column if not exists cook_soon boolean not null default false;
