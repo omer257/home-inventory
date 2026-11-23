@@ -132,6 +132,29 @@ function metaContent(html: string, prop: string): string | null {
   return c ? decode(c) : null;
 }
 
+const ING_LINE = /^(מצרכים|המצרכים|רכיבים|הרכיבים|מרכיבים|המרכיבים|חומרים|החומרים|ingredients)(\s|$)/i;
+
+function entities(s: string): string {
+  return s
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(parseInt(d, 10)))
+    .replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ").replace(/&amp;/g, "&");
+}
+
+// Plain text of the page around the ingredients heading, for sites without structured recipe data.
+function pageText(html: string): string | null {
+  const body = html
+    .replace(/<(script|style|noscript|svg|nav|header|footer|aside|form|iframe)[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/?(p|li|ul|ol|div|h[1-6]|tr|section|article|dt|dd)[^>]*>/gi, "\n")
+    .replace(/<[^>]+>/g, " ");
+  const lines = entities(body).split("\n").map((l) => l.replace(/\s+/g, " ").trim()).filter(Boolean);
+  const at = lines.findIndex((l) => l.length < 30 && ING_LINE.test(l.replace(/[:：]\s*$/, "")));
+  if (at < 0) return null;
+  return lines.slice(at, at + 150).join("\n").slice(0, 15000);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
   if (req.method !== "POST") return json({ error: "method" }, 405);
@@ -177,7 +200,7 @@ Deno.serve(async (req) => {
 
   const fallbackTitle = metaContent(html, "og:title") ?? decode(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] ?? "");
   if (!recipe) {
-    return json({ found: false, title: fallbackTitle || null, image_url: metaContent(html, "og:image"), source_url: target.href });
+    return json({ found: false, title: fallbackTitle || null, image_url: metaContent(html, "og:image"), source_url: target.href, text: pageText(html) });
   }
 
   const agg = (recipe.aggregateRating ?? {}) as Record<string, unknown>;
@@ -196,5 +219,6 @@ Deno.serve(async (req) => {
     total_time: duration(recipe.totalTime ?? recipe.cookTime),
     ingredients,
     instructions: instructions(recipe.recipeInstructions).join("\n"),
+    text: ingredients.length ? null : pageText(html),
   });
 });

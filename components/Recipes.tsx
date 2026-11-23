@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
 import { Item, expiryLabel, expiryStatus } from "@/lib/logic";
-import { LineMatch, Recipe, RecipeMatch, ingredientName, isIngredientHeading, matchRecipe, norm, parseRecipeText } from "@/lib/recipes";
+import { tidyPageText, LineMatch, Recipe, RecipeMatch, ingredientName, isIngredientHeading, matchRecipe, norm, parseRecipeText } from "@/lib/recipes";
 import { supabase } from "@/lib/supabase";
 import RecipeSearch from "./RecipeSearch";
 import type { Store } from "@/lib/useStore";
@@ -31,21 +31,23 @@ type Fetched = { found: boolean; draft: Partial<Recipe> } | null;
 async function fetchRecipe(url: string): Promise<Fetched> {
   const { data, error } = await supabase.functions.invoke("import-recipe", { body: { url } });
   if (error || !data) return null;
-  if (!data.found) return { found: false, draft: { title: data.title ?? "", source_url: data.source_url, image_url: data.image_url, ingredients: [] } };
-  return {
-    found: true,
-    draft: {
-      title: data.title ?? "",
-      source_url: data.source_url,
-      image_url: data.image_url,
-      rating: data.rating,
-      rating_count: data.rating_count,
-      servings: data.servings,
-      total_time: data.total_time,
-      ingredients: data.ingredients ?? [],
-      instructions: data.instructions ?? "",
-    },
+  const draft: Partial<Recipe> = {
+    title: data.title ?? "",
+    source_url: data.source_url,
+    image_url: data.image_url,
+    rating: data.rating ?? null,
+    rating_count: data.rating_count ?? null,
+    servings: data.servings ?? null,
+    total_time: data.total_time ?? null,
+    ingredients: data.ingredients ?? [],
+    instructions: data.instructions ?? "",
   };
+  if (!draft.ingredients!.length && data.text) {
+    const p = parseRecipeText(tidyPageText(data.text));
+    draft.ingredients = p.ingredients.filter((l) => l.length <= 100).slice(0, 40);
+    if (!draft.instructions) draft.instructions = p.instructions;
+  }
+  return { found: draft.ingredients!.length > 0, draft };
 }
 
 /* ---------- List ---------- */

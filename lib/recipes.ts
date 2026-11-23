@@ -184,8 +184,8 @@ export function isIngredientHeading(line: string) {
 
 /* ---------- Text import ---------- */
 
-const ING_HEAD = /^(מצרכים|המצרכים|רכיבים|הרכיבים|חומרים|ingredients)(\s|$)/i;
-const INS_HEAD = /^(אופן ההכנה|אופן הכנה|הוראות הכנה|ההכנה|הכנה|הוראות|instructions|method|directions|preparation)(\s|$)/i;
+const ING_HEAD = /^(מצרכים|המצרכים|רכיבים|הרכיבים|מרכיבים|המרכיבים|חומרים|החומרים|ingredients)(\s|$)/i;
+const INS_HEAD = /^(אופן ההכנה|אופן הכנה|הוראות הכנה|הוראות ההכנה|דרך ההכנה|ההכנה|הכנות|הכנה|הוראות|instructions|method|directions|preparation)(\s|$)/i;
 
 function clean(l: string) {
   return l.replace(/^[\s\-–•*·▪◦]+/, "").trim();
@@ -221,6 +221,28 @@ export function parseRecipeText(text: string): { title: string; ingredients: str
     ingredients: ingredients.map(clean).filter(Boolean),
     instructions: instructions.map((l) => clean(l).replace(/^\d+[.)]\s*/, "")).filter(Boolean).join("\n"),
   };
+}
+
+const PAGE_JUNK = /^(סועדים|מנות|לוח המרת מידות|טבלת המרות|בחר הכל|סמנו והוסיפו.*|הקישור הועתק|פרסומת|הדפסה|שתף|שמור)$/;
+const BARE_AMOUNT = /^[\d\s/.,½¼¾⅓⅔־–-]+$/;
+const BARE_UNIT = /^(כוס|כוסות|כף|כפות|כפית|כפיות|גרם|ג'|ק"ג|קילו|מ"ל|ליטר|יחידה|יחידות|חבילה|חבילות|קופסה|קופסאות|שן|שיני|צרור|קורט)$/;
+
+// Web pages often split "2 / כוסות / קמח" into separate elements; join them back and drop page chrome.
+export function tidyPageText(text: string): string {
+  const out: string[] = [];
+  let carry = "";
+  for (const raw of text.split("\n")) {
+    const l = raw.trim();
+    if (!l || PAGE_JUNK.test(l)) continue;
+    if (BARE_AMOUNT.test(l) || BARE_UNIT.test(l)) {
+      carry = carry ? `${carry} ${l}` : l;
+      continue;
+    }
+    out.push(carry && !/[:：]$/.test(l) ? `${carry} ${l}` : l);
+    carry = "";
+  }
+  if (carry) out.push(carry);
+  return out.join("\n");
 }
 
 export function googleRecipeSearch(names: string[] | string): string {
