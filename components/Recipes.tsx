@@ -1,8 +1,9 @@
 "use client";
 import { useMemo, useState } from "react";
 import { Item, expiryLabel, expiryStatus } from "@/lib/logic";
-import { LineMatch, Recipe, RecipeMatch, googleRecipeSearch, ingredientName, isIngredientHeading, matchRecipe, norm, parseRecipeText } from "@/lib/recipes";
+import { LineMatch, Recipe, RecipeMatch, ingredientName, isIngredientHeading, matchRecipe, norm, parseRecipeText } from "@/lib/recipes";
 import { supabase } from "@/lib/supabase";
+import RecipeSearch from "./RecipeSearch";
 import type { Store } from "@/lib/useStore";
 
 type Sort = "cook" | "pct" | "rating" | "new";
@@ -23,6 +24,30 @@ function Stars({ r }: { r: Recipe }) {
   );
 }
 
+/* ---------- Import from a URL ---------- */
+
+type Fetched = { found: boolean; draft: Partial<Recipe> } | null;
+
+async function fetchRecipe(url: string): Promise<Fetched> {
+  const { data, error } = await supabase.functions.invoke("import-recipe", { body: { url } });
+  if (error || !data) return null;
+  if (!data.found) return { found: false, draft: { title: data.title ?? "", source_url: data.source_url, image_url: data.image_url, ingredients: [] } };
+  return {
+    found: true,
+    draft: {
+      title: data.title ?? "",
+      source_url: data.source_url,
+      image_url: data.image_url,
+      rating: data.rating,
+      rating_count: data.rating_count,
+      servings: data.servings,
+      total_time: data.total_time,
+      ingredients: data.ingredients ?? [],
+      instructions: data.instructions ?? "",
+    },
+  };
+}
+
 /* ---------- List ---------- */
 
 export default function RecipesView({ store, focus, clearFocus }: { store: Store; focus: Item | null; clearFocus: () => void }) {
@@ -31,6 +56,7 @@ export default function RecipesView({ store, focus, clearFocus }: { store: Store
   const [adding, setAdding] = useState(false);
   const [openId, setOpenId] = useState<number | null>(null);
   const [editing, setEditing] = useState<Partial<Recipe> | null>(null);
+  const [searching, setSearching] = useState(false);
 
   const matched = useMemo(
     () => store.recipes.map((r) => ({ r, m: matchRecipe(r, store.items) })),
@@ -53,6 +79,17 @@ export default function RecipesView({ store, focus, clearFocus }: { store: Store
   const expiring = priorityItems(store.items);
   const searchNames = focus ? [focus.name] : expiring.map((i) => i.name);
   const open = openId != null ? matched.find(({ r }) => r.id === openId) : null;
+  const importedUrls = useMemo(() => new Set(store.recipes.map((r) => r.source_url).filter(Boolean) as string[]), [store.recipes]);
+
+  async function importFromSearch(url: string): Promise<boolean> {
+    if (importedUrls.has(url)) return true;
+    const res = await fetchRecipe(url);
+    if (!res || !res.found || !res.draft.ingredients?.length) return false;
+    const id = await store.saveRecipe(res.draft);
+    if (!id) { store.setError(null); return false; }
+    store.showToast({ text: `יובא: ${res.draft.title}` });
+    return true;
+  }
 
   return (
     <section>
@@ -68,11 +105,9 @@ export default function RecipesView({ store, focus, clearFocus }: { store: Store
         </div>
       )}
 
-      {searchNames.length > 0 && (
-        <a className="google-link" href={googleRecipeSearch(searchNames)} target="_blank" rel="noopener noreferrer">
-          חיפוש בגוגל: מתכון עם {searchNames.slice(0, 3).join(", ")}
-        </a>
-      )}
+      <button className="google-link" onClick={() => setSearching(true)}>
+        {searchNames.length ? `חיפוש מתכון ברשת: ${searchNames.slice(0, 3).join(", ")}` : "חיפוש מתכון ברשת לפי מה שיש בבית"}
+      </button>
 
       <div className="chips">
         <button className={sort === "cook" ? "on" : ""} onClick={() => setSort("cook")}>מה לבשל קודם</button>
@@ -110,6 +145,16 @@ export default function RecipesView({ store, focus, clearFocus }: { store: Store
         ))}
       </ul>
 
+      {searching && (
+        <RecipeSearch
+          store={store}
+          priority={expiring}
+          initial={focus}
+          imported={importedUrls}
+          onImport={importFromSearch}
+          onClose={() => setSearching(false)}
+        />
+      )}
       {adding && (
         <AddRecipe
           onClose={() => setAdding(false)}
@@ -152,25 +197,15 @@ function AddRecipe({ onClose, onReady }: { onClose: () => void; onReady: (d: Par
     if (!/^https?:\/\//i.test(u)) return setErr("צריך קישור שמתחיל ב-https://");
     setBusy(true);
     setErr(null);
-    const { data, error } = await supabase.functions.invoke("import-recipe", { body: { url: u } });
+    const res = await fetchRecipe(u);
     setBusy(false);
-    if (error || !data) return setErr("לא הצלחתי לקרוא את הדף. אפשר להעתיק את המתכון ולהדביק כטקסט.");
-    if (!data.found) {
+    if (!res) return setErr("לא הצלחתי לקרוא את הדף. אפשר להעתיק את המתכון ולהדביק כטקסט.");
+    if (!res.found) {
       setErr("בדף הזה אין נתוני מתכון מובנים. מילאתי את הכותרת, ואת המצרכים אפשר להדביק כטקסט.");
-      setTimeout(() => onReady({ title: data.title ?? "", source_url: data.source_url, image_url: data.image_url, ingredients: [] }), 1500);
+      setTimeout(() => onReady(res.draft), 1500);
       return;
     }
-    onReady({
-      title: data.title ?? "",
-      source_url: data.source_url,
-      image_url: data.image_url,
-      rating: data.rating,
-      rating_count: data.rating_count,
-      servings: data.servings,
-      total_time: data.total_time,
-      ingredients: data.ingredients ?? [],
-      instructions: data.instructions ?? "",
-    });
+    onReady(res.draft);
   }
 
   function fromText(e: React.FormEvent) {

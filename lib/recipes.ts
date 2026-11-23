@@ -223,7 +223,7 @@ export function parseRecipeText(text: string): { title: string; ingredients: str
   };
 }
 
-export function googleRecipeSearch(names: string[]): string {
-  const q = `מתכון ${names.slice(0, 3).join(" ")}`;
+export function googleRecipeSearch(names: string[] | string): string {
+  const q = typeof names === "string" ? names : `מתכון ${names.slice(0, 3).join(" ")}`;
   return `https://www.google.com/search?q=${encodeURIComponent(q)}`;
 }

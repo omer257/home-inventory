@@ -25,6 +25,7 @@ jobs:
           NEXT_PUBLIC_SUPABASE_URL: ${{ vars.SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.SUPABASE_ANON_KEY }}
           NEXT_PUBLIC_BASE_PATH: /${{ github.event.repository.name }}
+          NEXT_PUBLIC_GCSE_CX: ${{ vars.GCSE_CX }}
           NEXT_TELEMETRY_DISABLED: 1
       - uses: actions/upload-pages-artifact@v3
         with:
