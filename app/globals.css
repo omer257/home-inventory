@@ -140,6 +140,5 @@ textarea { width: 100%; padding: 10px 12px; border: 1px solid var(--line); borde
 .pick-chips button { border-radius: 999px; padding: 6px 12px; font-size: 14px; }
 .pick-chips button.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .gcse-box { min-height: 20px; direction: rtl; }
-.gcse-box .gsc-webResult { position: relative; }
-.import-btn { margin-top: 6px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); background: transparent; font-size: 14px; }
-.import-btn:disabled { opacity: 1; border-color: var(--line); color: inherit; }
+.import-bar { position: sticky; top: 0; z-index: 2; display: flex; gap: 8px; align-items: center; justify-content: space-between; background: var(--accent-soft); border-radius: 10px; padding: 8px 10px; font-size: 14px; }
+.import-bar strong { font-weight: 500; }

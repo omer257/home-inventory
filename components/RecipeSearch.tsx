@@ -16,7 +16,6 @@ type Gcse = {
 type W = Window & { __gcse?: Record<string, unknown>; google?: Gcse };
 
 let loader: Promise<void> | null = null;
-let onRendered: ((els: HTMLElement[]) => void) | null = null;
 
 function loadGcse(): Promise<void> {
   if (loader) return loader;
@@ -25,9 +24,6 @@ function loadGcse(): Promise<void> {
     w.__gcse = {
       parsetags: "explicit",
       initializationCallback: () => resolve(),
-      searchCallbacks: {
-        web: { rendered: (_g: string, _q: string, _p: HTMLElement[], results: HTMLElement[]) => onRendered?.(results) },
-      },
     };
     const s = document.createElement("script");
     s.src = `https://cse.google.com/cse.js?cx=${encodeURIComponent(CX)}`;
@@ -38,10 +34,12 @@ function loadGcse(): Promise<void> {
   return loader;
 }
 
-function resultUrl(el: HTMLElement): string | null {
-  const a = el.querySelector<HTMLAnchorElement>("a.gs-title");
-  const u = a?.getAttribute("data-ctorig") || a?.href || null;
-  return u && /^https?:\/\//.test(u) ? u : null;
+function clickedResult(target: EventTarget | null): { url: string; title: string } | null {
+  const a = (target as HTMLElement | null)?.closest?.("a.gs-title") as HTMLAnchorElement | null;
+  if (!a) return null;
+  const url = a.getAttribute("data-ctorig") || a.href;
+  if (!url || !/^https?:\/\//.test(url) || /google\./.test(new URL(url).hostname)) return null;
+  return { url, title: a.textContent?.trim() || url };
 }
 
 export default function RecipeSearch({
@@ -87,32 +85,28 @@ export default function RecipeSearch({
     });
   }
 
+  const [opened, setOpened] = useState<{ url: string; title: string } | null>(null);
+  const [importing, setImporting] = useState<"idle" | "busy" | "done" | "fail">("idle");
+
+  // We only watch which result was opened; Google's results themselves are left untouched.
   useEffect(() => {
-    onRendered = (els) => {
-      for (const el of els) {
-        if (el.querySelector(".import-btn")) continue;
-        const url = resultUrl(el);
-        if (!url) continue;
-        const b = document.createElement("button");
-        b.type = "button";
-        b.className = "import-btn";
-        const done = importedRef.current.has(url);
-        b.textContent = done ? "✓ יובא" : "ייבא";
-        b.disabled = done;
-        b.onclick = async (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          b.disabled = true;
-          b.textContent = "מייבא…";
-          const ok = await importRef.current(url);
-          b.textContent = ok ? "✓ יובא" : "לא הצליח";
-          if (!ok) b.disabled = false;
-        };
-        el.appendChild(b);
-      }
+    const el = box.current;
+    if (!el) return;
+    const onClick = (e: MouseEvent) => {
+      const r = clickedResult(e.target);
+      if (r) { setOpened(r); setImporting(importedRef.current.has(r.url) ? "done" : "idle"); }
     };
-    return () => { onRendered = null; };
+    el.addEventListener("click", onClick, true);
+    el.addEventListener("auxclick", onClick, true);
+    return () => { el.removeEventListener("click", onClick, true); el.removeEventListener("auxclick", onClick, true); };
   }, []);
+
+  async function importOpened() {
+    if (!opened) return;
+    setImporting("busy");
+    const ok = await importRef.current(opened.url);
+    setImporting(ok ? "done" : "fail");
+  }
 
   async function run() {
     if (!q) return;
@@ -174,6 +168,18 @@ export default function RecipeSearch({
         )}
         {!CX && query && <small className="hint">החיפוש בתוך האפליקציה עוד לא הוגדר. אפשר לחפש בגוגל ולהדביק קישור ב"+ מתכון".</small>}
         {state === "error" && <small className="error">החיפוש של גוגל לא נטען. אפשר להשתמש בקישור לגוגל המלא.</small>}
+        {opened && (
+          <div className="import-bar">
+            <span>פתחת: <strong>{opened.title}</strong></span>
+            {importing === "done" ? (
+              <span className="hint">✓ יובא לספרייה</span>
+            ) : (
+              <button className="primary small" disabled={importing === "busy"} onClick={importOpened}>
+                {importing === "busy" ? "מייבא…" : importing === "fail" ? "לא הצליח, לנסות שוב" : "ייבא"}
+              </button>
+            )}
+          </div>
+        )}
         <div ref={box} className="gcse-box" />
       </div>
     </div>
