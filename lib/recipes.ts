@@ -223,7 +223,9 @@ export function parseRecipeText(text: string): { title: string; ingredients: str
   };
 }
 
-const PAGE_JUNK = /^(סועדים|מנות|לוח המרת מידות|טבלת המרות|בחר הכל|סמנו והוסיפו.*|הקישור הועתק|פרסומת|הדפסה|שתף|שמור)$/;
+const PAGE_JUNK = /^(סועדים|מנות|לוח המרת מידות|טבלת המרות|בחר הכל|סמנו והוסיפו.*|הקישור הועתק|פרסומת|הדפסה|שתף|שמור|עוד ב-?|לכתבה המלאה|הצגת פוסט זה ב(אינסטגרם|instagram)|.*פוסט משותף על ידי.*|צפו ב.*|View this post on Instagram|A post shared by.*)$/i;
+// Where the article ends and site chrome begins (tags, comments, related articles).
+const PAGE_END = /^(תגיות|\d+ תגובות|תגובות.*|הכתבות החמות|כתבות נוספות|עוד כתבות|כתבות שאולי פספסתם|קראו עוד|קראו גם|אולי יעניין אותך|עקבו אחרינו|מתכונים נוספים|עוד מתכונים|Related.*|Comments.*)$/i;
 const BARE_AMOUNT = /^[\d\s/.,½¼¾⅓⅔־–-]+$/;
 const BARE_UNIT = /^(כוס|כוסות|כף|כפות|כפית|כפיות|גרם|ג'|ק"ג|קילו|מ"ל|ליטר|יחידה|יחידות|חבילה|חבילות|קופסה|קופסאות|שן|שיני|צרור|קורט)$/;
 
@@ -231,8 +233,12 @@ const BARE_UNIT = /^(כוס|כוסות|כף|כפות|כפית|כפיות|גרם|
 export function tidyPageText(text: string): string {
   const out: string[] = [];
   let carry = "";
+  let skipNext = false;
   for (const raw of text.split("\n")) {
     const l = raw.trim();
+    if (PAGE_END.test(l)) break;
+    if (skipNext) { skipNext = false; continue; }
+    if (/^(עוד ב-?|קראו גם:?|ראו גם:?)$/.test(l)) { skipNext = true; continue; }
     if (!l || PAGE_JUNK.test(l)) continue;
     if (BARE_AMOUNT.test(l) || BARE_UNIT.test(l)) {
       carry = carry ? `${carry} ${l}` : l;
