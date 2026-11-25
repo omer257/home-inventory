@@ -108,10 +108,34 @@ export default function RecipeSearch({
     setImporting(ok ? "done" : "fail");
   }
 
+  const [pasteUrl, setPasteUrl] = useState("");
+  const [pasteState, setPasteState] = useState<"idle" | "busy" | "done" | "fail">("idle");
+
+  async function importUrl(raw: string) {
+    const m = raw.match(/https?:\/\/\S+/);
+    if (!m) { setPasteState("fail"); return; }
+    setPasteUrl(m[0]);
+    setPasteState("busy");
+    const ok = await importRef.current(m[0]);
+    setPasteState(ok ? "done" : "fail");
+  }
+
+  async function pasteFromClipboard() {
+    try {
+      const t = await navigator.clipboard.readText();
+      if (t) return importUrl(t);
+    } catch { /* clipboard blocked: the field below still works */ }
+    setPasteState("fail");
+  }
+
   async function run() {
     if (!q) return;
     setQuery(q);
-    if (!CX) return;
+    setPasteState("idle");
+    if (!CX) {
+      window.open(googleRecipeSearch(q), "_blank", "noopener");
+      return;
+    }
     setState("loading");
     try {
       await loadGcse();
@@ -158,15 +182,36 @@ export default function RecipeSearch({
         </div>
 
         <button className="primary" disabled={!q || state === "loading"} onClick={run}>
-          {q ? `חפש: ${q}` : "בחרו מוצר אחד או יותר"}
+          {q ? (CX ? `חפש: ${q}` : `חפש בגוגל: ${q}`) : "בחרו מוצר אחד או יותר"}
         </button>
 
-        {query && (
+        {query && CX && (
           <a className="google-link" href={googleRecipeSearch(query)} target="_blank" rel="noopener noreferrer">
             פתח בגוגל המלא
           </a>
         )}
-        {!CX && query && <small className="hint">החיפוש בתוך האפליקציה עוד לא הוגדר. אפשר לחפש בגוגל ולהדביק קישור ב"+ מתכון".</small>}
+        {query && (
+          <div className="stack paste-box">
+            <small className="hint">מצאת מתכון? העתק את הקישור שלו, חזור לכאן ולחץ:</small>
+            <button className="primary" disabled={pasteState === "busy"} onClick={pasteFromClipboard}>
+              {pasteState === "busy" ? "מייבא…" : "הדבק וייבא"}
+            </button>
+            <input
+              className="search"
+              dir="ltr"
+              placeholder="או הדבק כאן קישור"
+              value={pasteUrl}
+              onChange={(e) => { setPasteUrl(e.target.value); setPasteState("idle"); }}
+              onKeyDown={(e) => { if (e.key === "Enter") importUrl(pasteUrl); }}
+            />
+            {pasteState === "done" && <small className="hint">✓ יובא לספרייה. אפשר לחפש עוד או לסגור.</small>}
+            {pasteState === "fail" && (
+              <small className="error">
+                {pasteUrl ? "לא הצלחתי לקרוא מתכון מהקישור הזה. אפשר לנסות מתכון מאתר אחר, או להדביק את הטקסט ב\"+ מתכון\"." : "לא מצאתי קישור. העתק את הקישור והדבק בשדה."}
+              </small>
+            )}
+          </div>
+        )}
         {state === "error" && <small className="error">החיפוש של גוגל לא נטען. אפשר להשתמש בקישור לגוגל המלא.</small>}
         {opened && (
           <div className="import-bar">
